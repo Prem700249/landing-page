@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Complete Payment - Skillify</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; text-align: center; padding: 60px 20px; background: #f8f9fa; color: #2c3e50; }
+        .card { background: #fff; max-width: 500px; margin: 0 auto; padding: 40px; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        h1 { margin-bottom: 20px; }
+        .price { font-size: 2.5rem; color: #27ae60; font-weight: bold; margin: 20px 0; }
+        .btn { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff; padding: 15px 40px; font-size: 1.2rem; border: none; border-radius: 50px; cursor: pointer; text-decoration: none; display: inline-block; margin-top: 20px; }
+        .btn:hover { opacity: 0.9; }
+        .note { font-size: 0.9rem; color: #7f8c8d; margin-top: 25px; }
+        .success-box { display: none; }
+        .success-box h1 { color: #27ae60; }
+    </style>
+</head>
+<body>
+    
+    <!-- This box shows BEFORE payment -->
+    <div class="card" id="payment-box">
+        <h1>Almost There! 🎉</h1>
+        <p>Please confirm your enrollment and complete the payment.</p>
+        <div class="price" id="display-price">₹99</div>
+        <a id="pay-now-btn" class="btn" href="#">Pay Now</a>
+        <p class="note">Secure payment powered by Razorpay</p>
+    </div>
+
+    <!-- This box shows AFTER successful payment -->
+    <div class="card success-box" id="success-box">
+        <h1>Success! 🎉</h1>
+        <p>Your enrollment is confirmed.</p>
+        <p style="margin-top: 15px;"><strong>Payment ID:</strong> <br><span id="payment-id-display"></span></p>
+        <p style="margin-top: 15px;">Your data has been saved. You will receive course access details at your email within 24 hours.</p>
+        <a href="mailto:support@skillify.com" class="btn" style="font-size: 1rem; padding: 10px 20px;">Contact Support</a>
+    </div>
+
+    <!-- Firebase & Logic -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        // =====================================================================
+        // 👇 EDIT #1 TO #6: PASTE YOUR FIREBASE CONFIG HERE 👇
+        // =====================================================================
+        const firebaseConfig = {
+  apiKey: "AIzaSyCr2IANAX6HTe-fbWAELrYcZshUWUJkOK0",
+  authDomain: "skillyfai.firebaseapp.com",
+  projectId: "skillyfai",
+  storageBucket: "skillyfai.firebasestorage.app",
+  messagingSenderId: "957525570827",
+  appId: "1:957525570827:web:4bf5f487d020b9b66c9e0e"
+};
+        // =====================================================================
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const paymentId = urlParams.get('razorpay_payment_id');
+        const pending = JSON.parse(sessionStorage.getItem('pendingStudent'));
+        const selectedPrice = sessionStorage.getItem('selectedPrice') || '99'; 
+
+        if (paymentId && pending) {
+            // --- PAYMENT SUCCESSFUL ---
+            document.getElementById('payment-box').style.display = 'none';
+            document.getElementById('success-box').style.display = 'block';
+            document.getElementById('payment-id-display').textContent = paymentId;
+
+            // Save to Firebase
+            addDoc(collection(db, "enrollments"), {
+                name: pending.name,
+                email: pending.email,
+                phone: pending.phone,
+                paymentId: paymentId,
+                amount: selectedPrice,
+                currency: "INR",
+                paymentStatus: "unverified_client_side",
+                enrollmentDate: serverTimestamp(),
+                accessGranted: false
+            })
+            .then(() => {
+                sessionStorage.removeItem('pendingStudent');
+                sessionStorage.removeItem('selectedPrice');
+            })
+            .catch((error) => {
+                console.error("Error saving to Firebase: ", error);
+            });
+
+        } else if (pending) {
+            // --- USER NEEDS TO PAY ---
+            document.getElementById('display-price').textContent = '₹' + selectedPrice;
+
+            // =====================================================================
+            // 👇 EDIT #7: PASTE YOUR RAZORPAY PAGE ID HERE 👇
+            // =====================================================================
+            const razorpayBase = 'https://pages.razorpay.com/pl_Ts3UMemKHSvZpO/view'; // Edit #7
+            
+            const paymentUrl = `${razorpayBase}?amount=${selectedPrice}` +
+                               `&email=${encodeURIComponent(pending.email)}` +
+                               `&phone=${encodeURIComponent(pending.phone)}` +
+                               `&full_name=${encodeURIComponent(pending.name)}`;
+
+            document.getElementById('pay-now-btn').href = paymentUrl;
+
+        } else {
+            alert('Please fill the enrollment form first.');
+            window.location.href = 'enroll.html';
+        }
+    </script>
+</body>
+</html>
